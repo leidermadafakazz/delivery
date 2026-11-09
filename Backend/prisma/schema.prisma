@@ -198,10 +198,10 @@ model Product {
   stock       Int?
   isAvailable Boolean @default(true)
 
-  // Control del administrador: un producto inactivo no se muestra al público.
+ 
   isActive Boolean @default(true)
 
-  // Eliminación lógica realizada por la empresa.
+ 
   deletedAt DateTime?
 
   createdAt DateTime @default(now())
@@ -299,8 +299,7 @@ model OrderStatusHistory {
   @@index([createdAt])
 }
 
-/// Solicitud de cambio de los datos de la cuenta (nombre, correo, teléfono).
-/// El administrador debe aprobarla para que se aplique al usuario.
+
 model ProfileChangeRequest {
   id       Int    @id @default(autoincrement())
   userId   Int    @unique
@@ -323,9 +322,7 @@ model ProfileChangeRequest {
   @@index([createdAt])
 }
 
-/// Calificación de un pedido entregado. Cada participante puede calificar
-/// una vez a cada contraparte: el cliente al negocio y al domiciliario, y
-/// ellos al cliente.
+
 model Rating {
   id           Int          @id @default(autoincrement())
   orderId      Int
