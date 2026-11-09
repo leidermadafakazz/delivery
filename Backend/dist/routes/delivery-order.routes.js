@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const client_1 = require("@prisma/client");
+const auth_middleware_1 = require("../middlewares/auth.middleware");
+const roles_middleware_1 = require("../middlewares/roles.middleware");
+const delivery_middleware_1 = require("../middlewares/delivery.middleware");
+const delivery_order_controller_1 = require("../controllers/delivery-order.controller");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authenticateToken, (0, roles_middleware_1.authorizeRoles)(client_1.RoleName.DELIVERY), delivery_middleware_1.requireApprovedDelivery);
+router.get("/available-orders", delivery_order_controller_1.listAvailableOrders);
+router.get("/orders", delivery_order_controller_1.listMyDeliveryOrders);
+router.get("/orders/:id", delivery_order_controller_1.getMyDeliveryOrder);
+router.patch("/orders/:id/accept", delivery_order_controller_1.acceptAvailableOrder);
+router.patch("/orders/:id/pickup", delivery_order_controller_1.pickupOrder);
+router.patch("/orders/:id/deliver", delivery_order_controller_1.deliverOrder);
+exports.default = router;

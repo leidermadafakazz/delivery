@@ -1,0 +1,901 @@
+{
+  "info": {
+    "_postman_id": "b7f9f6a2-2d7e-4f3a-9c1e-000000000002",
+    "name": "FastDelivery – Módulo 2",
+    "description": "Flujo completo del Módulo 2: registro de empresa y domiciliario, aprobación, rechazo, reenvío, roles y permisos.\n\nEjecuta la colección en orden o usa el Collection Runner con el entorno 'FastDelivery Local'. Cada ejecución crea usuarios nuevos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Preparación",
+      "item": [
+        {
+          "name": "01 · Login administrador",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('token_admin', jsonBody.token);",
+                  "pm.test('Rol ADMIN', () => pm.expect(jsonBody.user.roles).to.include('ADMIN'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Inicia sesión con el administrador creado por el seed."
+          }
+        },
+        {
+          "name": "02 · Registrar usuario empresa",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const runId = Date.now().toString();",
+                  "pm.environment.set('runId', runId);",
+                  "pm.environment.set('empresa_email', 'empresa.' + runId + '@test.com');",
+                  "pm.environment.set('empresa_password', 'Test1234!');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 creado', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('token_empresa', pm.response.json().token);",
+                  "pm.test('Rol CLIENT inicial', () => pm.expect(pm.response.json().user.roles).to.include('CLIENT'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Empresa Postman\",\n  \"email\": \"{{empresa_email}}\",\n  \"password\": \"{{empresa_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/register",
+            "description": "Cada ejecución genera un correo único con runId."
+          }
+        },
+        {
+          "name": "03 · Registrar usuario domiciliario",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.environment.get('runId')) {",
+                  "  pm.environment.set('runId', Date.now().toString());",
+                  "}",
+                  "pm.environment.set('domiciliario_email', 'domiciliario.' + pm.environment.get('runId') + '@test.com');",
+                  "pm.environment.set('domiciliario_password', 'Test1234!');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 creado', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('token_domiciliario', pm.response.json().token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Domiciliario Postman\",\n  \"email\": \"{{domiciliario_email}}\",\n  \"password\": \"{{domiciliario_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        },
+        {
+          "name": "04 · Login usuario empresa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.environment.set('token_empresa', pm.response.json().token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{empresa_email}}\",\n  \"password\": \"{{empresa_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "05 · Login usuario domiciliario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.environment.set('token_domiciliario', pm.response.json().token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{domiciliario_email}}\",\n  \"password\": \"{{domiciliario_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Empresa / tienda",
+      "item": [
+        {
+          "name": "06 · Registrar empresa",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.environment.get('runId')) {",
+                  "  pm.environment.set('runId', Date.now().toString());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 creado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('businessId', jsonBody.business.id);",
+                  "pm.test('Estado PENDING', () => pm.expect(jsonBody.business.status).to.eql('PENDING'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessName\": \"Restaurante Postman\",\n  \"legalName\": \"Restaurante Postman SAS\",\n  \"taxId\": \"NIT-{{runId}}\",\n  \"businessType\": \"RESTAURANT\",\n  \"description\": \"Prueba del Módulo 2\",\n  \"address\": \"Calle 123 #45-67\",\n  \"city\": \"Bogotá\",\n  \"department\": \"Cundinamarca\",\n  \"contactPhone\": \"3001234567\",\n  \"contactEmail\": \"contacto.{{runId}}@test.com\",\n  \"logoUrl\": \"https://example.com/logo.png\",\n  \"documentUrl\": \"https://example.com/camara-comercio.pdf\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/businesses/register"
+          }
+        },
+        {
+          "name": "07 · Consultar mi empresa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Es mi solicitud', () => pm.expect(pm.response.json().business.id).to.eql(Number(pm.environment.get('businessId'))));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me"
+          }
+        },
+        {
+          "name": "08 · Admin: ver empresas pendientes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "const id = Number(pm.environment.get('businessId'));",
+                  "pm.test('La empresa aparece en pendientes', () => pm.expect(jsonBody.businesses.some(item => item.id === id)).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/requests?type=business&status=PENDING&limit=100"
+          }
+        },
+        {
+          "name": "09 · Admin: aprobar empresa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado APPROVED', () => pm.expect(pm.response.json().business.status).to.eql('APPROVED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/{{businessId}}/approve"
+          }
+        },
+        {
+          "name": "10 · Verificar rol BUSINESS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const user = pm.response.json().user;",
+                  "pm.test('Tiene rol BUSINESS', () => pm.expect(user.roles).to.include('BUSINESS'));",
+                  "pm.test('Perfil aprobado', () => pm.expect(user.businessProfile.status).to.eql('APPROVED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "11 · Admin: rechazar empresa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado REJECTED', () => pm.expect(pm.response.json().business.status).to.eql('REJECTED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Documentación incompleta (prueba Postman)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/businesses/{{businessId}}/reject"
+          }
+        },
+        {
+          "name": "12 · Verificar revocación de BUSINESS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const user = pm.response.json().user;",
+                  "pm.test('Ya no tiene rol BUSINESS', () => pm.expect(user.roles).to.not.include('BUSINESS'));",
+                  "pm.test('Motivo de rechazo visible', () => pm.expect(user.businessProfile.status).to.eql('REJECTED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "13 · Reenviar empresa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const business = pm.response.json().business;",
+                  "pm.test('Vuelve a PENDING', () => pm.expect(business.status).to.eql('PENDING'));",
+                  "pm.test('Se limpia el motivo de rechazo', () => pm.expect(business.rejectionReason).to.eql(null));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessName\": \"Restaurante Postman\",\n  \"legalName\": \"Restaurante Postman SAS\",\n  \"taxId\": \"NIT-{{runId}}\",\n  \"businessType\": \"RESTAURANT\",\n  \"description\": \"Documentación corregida desde Postman\",\n  \"address\": \"Calle 123 #45-67\",\n  \"city\": \"Bogotá\",\n  \"department\": \"Cundinamarca\",\n  \"contactPhone\": \"3001234567\",\n  \"contactEmail\": \"contacto.{{runId}}@test.com\",\n  \"logoUrl\": \"https://example.com/logo.png\",\n  \"documentUrl\": \"https://example.com/camara-comercio.pdf\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/businesses/me"
+          }
+        },
+        {
+          "name": "14 · Admin: aprobar empresa nuevamente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado APPROVED', () => pm.expect(pm.response.json().business.status).to.eql('APPROVED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/{{businessId}}/approve"
+          }
+        },
+        {
+          "name": "15 · Admin: detalle de empresa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Sigue aprobada', () => pm.expect(pm.response.json().business.status).to.eql('APPROVED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/{{businessId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Domiciliario",
+      "item": [
+        {
+          "name": "16 · Registrar domiciliario",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.environment.get('runId')) {",
+                  "  pm.environment.set('runId', Date.now().toString());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 creado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('deliveryId', jsonBody.delivery.id);",
+                  "pm.test('Estado PENDING', () => pm.expect(jsonBody.delivery.status).to.eql('PENDING'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"CC\",\n  \"documentNumber\": \"CC-{{runId}}\",\n  \"birthDate\": \"1995-05-20\",\n  \"address\": \"Carrera 10 #20-30\",\n  \"city\": \"Medellín\",\n  \"vehicleType\": \"MOTORCYCLE\",\n  \"vehiclePlate\": \"ABC12D\",\n  \"licenseNumber\": \"LIC-{{runId}}\",\n  \"documentUrl\": \"https://example.com/cedula.pdf\",\n  \"licenseUrl\": \"https://example.com/licencia.pdf\",\n  \"emergencyContactName\": \"Contacto Postman\",\n  \"emergencyContactPhone\": \"3009876543\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/deliveries/register"
+          }
+        },
+        {
+          "name": "17 · Admin: ver domiciliarios pendientes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "const id = Number(pm.environment.get('deliveryId'));",
+                  "pm.test('El domiciliario aparece en pendientes', () => pm.expect(jsonBody.deliveries.some(item => item.id === id)).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/requests?type=delivery&status=PENDING&limit=100"
+          }
+        },
+        {
+          "name": "18 · Admin: rechazar domiciliario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado REJECTED', () => pm.expect(pm.response.json().delivery.status).to.eql('REJECTED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Licencia de conducción vencida (prueba Postman)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/deliveries/{{deliveryId}}/reject"
+          }
+        },
+        {
+          "name": "19 · Ver motivo de rechazo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const delivery = pm.response.json().delivery;",
+                  "pm.test('Estado REJECTED', () => pm.expect(delivery.status).to.eql('REJECTED'));",
+                  "pm.test('Tiene motivo de rechazo', () => pm.expect(delivery.rejectionReason).to.be.a('string'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/me"
+          }
+        },
+        {
+          "name": "20 · Reenviar domiciliario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const delivery = pm.response.json().delivery;",
+                  "pm.test('Vuelve a PENDING', () => pm.expect(delivery.status).to.eql('PENDING'));",
+                  "pm.test('Se limpia el motivo de rechazo', () => pm.expect(delivery.rejectionReason).to.eql(null));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"CC\",\n  \"documentNumber\": \"CC-{{runId}}\",\n  \"birthDate\": \"1995-05-20\",\n  \"address\": \"Carrera 10 #20-30\",\n  \"city\": \"Medellín\",\n  \"vehicleType\": \"MOTORCYCLE\",\n  \"vehiclePlate\": \"ABC12D\",\n  \"licenseNumber\": \"LIC-{{runId}}\",\n  \"documentUrl\": \"https://example.com/cedula.pdf\",\n  \"licenseUrl\": \"https://example.com/licencia-nueva.pdf\",\n  \"emergencyContactName\": \"Contacto Postman\",\n  \"emergencyContactPhone\": \"3009876543\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/deliveries/me"
+          }
+        },
+        {
+          "name": "21 · Admin: aprobar domiciliario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado APPROVED', () => pm.expect(pm.response.json().delivery.status).to.eql('APPROVED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/{{deliveryId}}/approve"
+          }
+        },
+        {
+          "name": "22 · Verificar rol DELIVERY",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const user = pm.response.json().user;",
+                  "pm.test('Tiene rol DELIVERY', () => pm.expect(user.roles).to.include('DELIVERY'));",
+                  "pm.test('Perfil aprobado', () => pm.expect(user.deliveryProfile.status).to.eql('APPROVED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "23 · Admin: detalle de domiciliario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Sigue aprobado', () => pm.expect(pm.response.json().delivery.status).to.eql('APPROVED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/{{deliveryId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Panel y permisos",
+      "item": [
+        {
+          "name": "24 · Dashboard del administrador",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.test('Hay empresas aprobadas', () => pm.expect(jsonBody.stats.businesses.APPROVED).to.be.at.least(1));",
+                  "pm.test('Hay domiciliarios aprobados', () => pm.expect(jsonBody.stats.deliveries.APPROVED).to.be.at.least(1));",
+                  "console.log('Estadísticas:', JSON.stringify(jsonBody.stats));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/dashboard"
+          }
+        },
+        {
+          "name": "25 · Panel sin token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('401 No autenticado', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/dashboard"
+          }
+        },
+        {
+          "name": "26 · Panel con token cliente (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('403 Sin permisos', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/dashboard"
+          }
+        },
+        {
+          "name": "27 · Filtro de estado inválido (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 Filtro inválido', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses?status=INVALID"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    }
+  ]
+}

@@ -1,0 +1,1347 @@
+{
+  "info": {
+    "_postman_id": "b7f9f6a2-2d7e-4f3a-9c1e-000000000003",
+    "name": "FastDelivery – Módulo 3",
+    "description": "Flujo completo del Módulo 3: empresas aprobadas, categorías, productos, catálogo público, búsqueda, disponibilidad, permisos, moderación del administrador y eliminación lógica.\n\nEjecuta la colección en orden o usa el Collection Runner con el entorno 'FastDelivery Local'. Cada ejecución crea usuarios nuevos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Preparación",
+      "item": [
+        {
+          "name": "01 · Login administrador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Inicia sesión con el administrador creado por el seed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('token_admin', jsonBody.token);",
+                  "pm.test('Rol ADMIN', () => pm.expect(jsonBody.user.roles).to.include('ADMIN'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 · Registrar usuario empresa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/register",
+            "description": "Cada ejecución genera un correo único con runId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Empresa Postman\",\n  \"email\": \"{{empresa_email}}\",\n  \"password\": \"{{empresa_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const runId = Date.now().toString();",
+                  "pm.environment.set('runId', runId);",
+                  "pm.environment.set('empresa_email', 'empresa.' + runId + '@test.com');",
+                  "pm.environment.set('empresa_password', 'Test1234!');",
+                  "pm.environment.set('empresa_nombre', 'Restaurante Postman ' + runId);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 creado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('token_empresa', jsonBody.token);",
+                  "pm.test('Rol CLIENT inicial', () => pm.expect(jsonBody.user.roles).to.include('CLIENT'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 · Registrar empresa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessName\": \"{{empresa_nombre}}\",\n  \"legalName\": \"Restaurante Postman SAS\",\n  \"taxId\": \"NIT-PM-{{runId}}\",\n  \"businessType\": \"RESTAURANT\",\n  \"description\": \"Negocio creado por la colección del Módulo 3\",\n  \"address\": \"Calle 1 #2-3\",\n  \"city\": \"Bogotá\",\n  \"department\": \"Cundinamarca\",\n  \"contactPhone\": \"3001234567\",\n  \"contactEmail\": \"contacto.{{runId}}@test.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 creado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('businessId', jsonBody.business.id);",
+                  "pm.test('Estado PENDING', () => pm.expect(jsonBody.business.status).to.eql('PENDING'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 · Aprobar empresa",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/{{businessId}}/approve",
+            "description": "El administrador aprueba la empresa para habilitar el catálogo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Empresa aprobada', () => pm.expect(pm.response.json().business.status).to.eql('APPROVED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 · Registrar cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cliente Postman\",\n  \"email\": \"{{cliente_email}}\",\n  \"password\": \"{{cliente_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set('cliente_email', 'cliente.' + pm.environment.get('runId') + '@test.com');",
+                  "pm.environment.set('cliente_password', 'Test1234!');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 creado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('token_cliente', jsonBody.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Categorías",
+      "item": [
+        {
+          "name": "06 · Crear categoría Platos fuertes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/categories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Platos fuertes\",\n  \"description\": \"Comidas principales\",\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 creado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('categoria1Id', jsonBody.category.id);",
+                  "pm.test('Nombre correcto', () => pm.expect(jsonBody.category.name).to.eql('Platos fuertes'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 · Crear categoría Bebidas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/categories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bebidas\",\n  \"sortOrder\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 creado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('categoria2Id', jsonBody.category.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 · Listar mis categorías",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/categories"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Dos categorías', () => pm.expect(pm.response.json().categories).to.have.lengthOf(2));",
+                  "pm.test('Incluye conteo de productos', () => pm.expect(pm.response.json().categories[0]).to.have.property('_count'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 · Actualizar categoría",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/categories/{{categoria2Id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bebidas frías\",\n  \"description\": \"Jugos y gaseosas\",\n  \"sortOrder\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Nombre actualizado', () => pm.expect(pm.response.json().category.name).to.eql('Bebidas frías'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 · Categoría duplicada (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/categories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Platos fuertes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 conflicto', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Productos",
+      "item": [
+        {
+          "name": "11 · Crear producto con categoría",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bandeja paisa\",\n  \"description\": \"Plato típico colombiano\",\n  \"price\": 28000.5,\n  \"categoryId\": \"{{categoria1Id}}\",\n  \"sku\": \"BANDEJA-{{runId}}\",\n  \"stock\": 10,\n  \"isAvailable\": true,\n  \"imageUrl\": \"https://example.com/bandeja.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 creado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('producto1Id', jsonBody.product.id);",
+                  "pm.test('Precio numérico', () => pm.expect(jsonBody.product.price).to.eql(28000.5));",
+                  "pm.test('Disponible', () => pm.expect(jsonBody.product.isAvailable).to.eql(true));",
+                  "pm.test('Activo', () => pm.expect(jsonBody.product.isActive).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 · Crear producto sin categoría",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Limonada\",\n  \"price\": \"7000\",\n  \"categoryId\": null,\n  \"stock\": 0,\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 creado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('producto2Id', jsonBody.product.id);",
+                  "pm.test('Sin categoría', () => pm.expect(jsonBody.product.categoryId).to.eql(null));",
+                  "pm.test('Precio convertido a número', () => pm.expect(jsonBody.product.price).to.eql(7000));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 · Listar mis productos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.test('Dos productos', () => pm.expect(jsonBody.pagination.total).to.eql(2));",
+                  "pm.test('Precios numéricos', () => jsonBody.products.forEach(p => pm.expect(p.price).to.be.a('number')));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 · Detalle de mi producto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Incluye categoría', () => pm.expect(pm.response.json().product.category.name).to.eql('Platos fuertes'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 · SKU duplicado (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Producto duplicado\",\n  \"price\": 10000,\n  \"sku\": \"BANDEJA-{{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 conflicto', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 · Precio inválido (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Producto inválido\",\n  \"price\": -5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 inválido', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Catálogo público",
+      "item": [
+        {
+          "name": "17 · Listar empresas aprobadas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/catalog/businesses?limit=100"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "const mine = jsonBody.businesses.find(b => String(b.id) === String(pm.environment.get('businessId')));",
+                  "pm.test('Empresa visible', () => pm.expect(mine).to.not.be.undefined);",
+                  "pm.test('Dos productos públicos', () => pm.expect(mine.productCount).to.eql(2));",
+                  "pm.test('Sin datos sensibles', () => pm.expect(mine).to.not.have.property('taxId'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "18 · Detalle del catálogo público",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/catalog/businesses/{{businessId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "const products = [...jsonBody.categories.flatMap(c => c.products), ...jsonBody.uncategorized];",
+                  "pm.test('Dos productos en total', () => pm.expect(products).to.have.lengthOf(2));",
+                  "pm.test('Precio numérico', () => pm.expect(products[0].price).to.be.a('number'));",
+                  "pm.test('Incluye la categoría creada', () => pm.expect(jsonBody.categories.some(c => String(c.id) === String(pm.environment.get('categoria1Id')))).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "19 · Buscar producto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/catalog/products?search=Bandeja&businessId={{businessId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.test('Encuentra el producto', () => pm.expect(jsonBody.products.some(p => String(p.id) === String(pm.environment.get('producto1Id')))).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "20 · Filtrar por rango de precio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/catalog/products?businessId={{businessId}}&minPrice=10000&maxPrice=30000"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.test('Solo el producto del rango', () => pm.expect(jsonBody.products).to.have.lengthOf(1));",
+                  "pm.test('Producto correcto', () => pm.expect(jsonBody.products[0].id).to.eql(Number(pm.environment.get('producto1Id'))));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "21 · Detalle público del producto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/catalog/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.test('Incluye la empresa', () => pm.expect(String(jsonBody.product.business.id)).to.eql(String(pm.environment.get('businessId'))));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "22 · Orden inválido (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/catalog/products?sort=invalid"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 inválido', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Disponibilidad y permisos",
+      "item": [
+        {
+          "name": "23 · Marcar producto no disponible",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto1Id}}/availability",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isAvailable\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('No disponible', () => pm.expect(pm.response.json().product.isAvailable).to.eql(false));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "24 · Verificar que se oculta al público",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/catalog/products?businessId={{businessId}}&search=Bandeja"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.test('Producto oculto', () => pm.expect(jsonBody.products.some(p => String(p.id) === String(pm.environment.get('producto1Id')))).to.eql(false));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "25 · Volver a marcar disponible",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto1Id}}/availability",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Disponible', () => pm.expect(pm.response.json().product.isAvailable).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "26 · Cliente no puede crear categorías (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/categories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Categoría de cliente\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('403 prohibido', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "27 · Sin token no se puede gestionar (401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/categories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Categoría anónima\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('401 no autenticado', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Moderación del administrador",
+      "item": [
+        {
+          "name": "28 · Admin lista productos de la empresa",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/products?businessId={{businessId}}&limit=100"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.test('Incluye el producto', () => pm.expect(jsonBody.products.some(p => String(p.id) === String(pm.environment.get('producto1Id')))).to.eql(true));",
+                  "pm.test('Incluye la empresa', () => pm.expect(jsonBody.products[0]).to.have.property('business'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "29 · Admin desactiva el producto",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/products/{{producto1Id}}/deactivate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.test('Inactivo', () => pm.expect(jsonBody.product.isActive).to.eql(false));",
+                  "pm.test('No disponible', () => pm.expect(jsonBody.product.isAvailable).to.eql(false));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "30 · Producto desactivado no es público (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/catalog/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 no encontrado', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "31 · La empresa ve el producto inactivo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('isActive false', () => pm.expect(pm.response.json().product.isActive).to.eql(false));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "32 · Admin reactiva el producto",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/products/{{producto1Id}}/activate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.test('Activo', () => pm.expect(jsonBody.product.isActive).to.eql(true));",
+                  "pm.test('Sigue no disponible', () => pm.expect(jsonBody.product.isAvailable).to.eql(false));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "33 · Sigue oculto hasta que la empresa lo disponga (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/catalog/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 no encontrado', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "34 · La empresa vuelve a marcarlo disponible",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto1Id}}/availability",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "35 · El producto vuelve al catálogo público",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/catalog/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Eliminación lógica",
+      "item": [
+        {
+          "name": "36 · Eliminar producto sin categoría",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto2Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('deletedAt asignado', () => pm.expect(pm.response.json().product.deletedAt).to.not.eql(null));",
+                  "pm.test('No disponible', () => pm.expect(pm.response.json().product.isAvailable).to.eql(false));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "37 · El listado normal no lo incluye",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.test('Producto eliminado oculto', () => pm.expect(jsonBody.products.some(p => String(p.id) === String(pm.environment.get('producto2Id')))).to.eql(false));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "38 · includeDeleted=true lo incluye",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products?includeDeleted=true"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.test('Producto eliminado visible', () => pm.expect(jsonBody.products.some(p => String(p.id) === String(pm.environment.get('producto2Id')))).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "39 · Producto eliminado no es público (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/catalog/products/{{producto2Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 no encontrado', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "40 · Admin no reactiva un producto eliminado (409)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/products/{{producto2Id}}/activate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 conflicto', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "41 · Restaurar producto",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto2Id}}/restore"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.test('deletedAt limpio', () => pm.expect(jsonBody.product.deletedAt).to.eql(null));",
+                  "pm.test('Queda no disponible', () => pm.expect(jsonBody.product.isAvailable).to.eql(false));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "42 · Restaurado sigue oculto al público (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/catalog/products/{{producto2Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 no encontrado', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "43 · Eliminar categoría Platos fuertes",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/categories/{{categoria1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Informa productos afectados', () => pm.expect(pm.response.json().affectedProducts).to.eql(1));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "44 · El producto queda sin categoría",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('categoryId null', () => pm.expect(pm.response.json().product.categoryId).to.eql(null));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

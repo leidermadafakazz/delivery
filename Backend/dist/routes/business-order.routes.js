@@ -1,0 +1,16 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const client_1 = require("@prisma/client");
+const auth_middleware_1 = require("../middlewares/auth.middleware");
+const roles_middleware_1 = require("../middlewares/roles.middleware");
+const business_middleware_1 = require("../middlewares/business.middleware");
+const business_order_controller_1 = require("../controllers/business-order.controller");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authenticateToken, (0, roles_middleware_1.authorizeRoles)(client_1.RoleName.BUSINESS), business_middleware_1.requireApprovedBusiness);
+router.get("/", business_order_controller_1.listBusinessOrders);
+router.get("/:id", business_order_controller_1.getBusinessOrder);
+router.patch("/:id/accept", business_order_controller_1.acceptBusinessOrder);
+router.patch("/:id/reject", business_order_controller_1.rejectBusinessOrder);
+router.patch("/:id/status", business_order_controller_1.updateBusinessOrderStatus);
+exports.default = router;

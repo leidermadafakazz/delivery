@@ -1,0 +1,8 @@
+
+> backend@1.0.0 dev
+> tsx watch src/server.ts
+
+◇ injected env (0) from .env
+FastDelivery API: http://localhost:3000
+MySQL conectado correctamente
+Tiempo real (Socket.IO) activo

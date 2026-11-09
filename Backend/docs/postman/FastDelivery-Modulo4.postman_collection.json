@@ -1,0 +1,1986 @@
+{
+  "info": {
+    "_postman_id": "b7f9f6a2-2d7e-4f3a-9c1e-000000000004",
+    "name": "FastDelivery – Módulo 4",
+    "description": "Flujo completo del Módulo 4: pedidos del cliente, aceptación y preparación de la empresa, entrega del domiciliario, asignación y cancelación del administrador, historial de estados, stock y permisos.\n\nEjecuta la colección en orden o usa el Collection Runner con el entorno 'FastDelivery Local'. Cada ejecución crea usuarios nuevos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Preparación",
+      "item": [
+        {
+          "name": "01 · Login administrador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Inicia sesión con el administrador creado por el seed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('token_admin', jsonBody.token);",
+                  "pm.test('Rol ADMIN', () => pm.expect(jsonBody.user.roles).to.include('ADMIN'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 · Registrar usuario empresa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/register",
+            "description": "Cada ejecución genera un correo único con runId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Empresa Postman\",\n  \"email\": \"{{empresa_email}}\",\n  \"password\": \"{{empresa_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const runId = Date.now().toString();",
+                  "pm.environment.set('runId', runId);",
+                  "pm.environment.set('empresa_email', 'empresa.' + runId + '@test.com');",
+                  "pm.environment.set('empresa_password', 'Test1234!');",
+                  "pm.environment.set('empresa_nombre', 'Restaurante Postman ' + runId);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 esperado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('token_empresa', jsonBody.token);",
+                  "pm.test('Rol CLIENT inicial', () => pm.expect(jsonBody.user.roles).to.include('CLIENT'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 · Registrar empresa con domicilio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessName\": \"{{empresa_nombre}}\",\n  \"legalName\": \"Restaurante Postman SAS\",\n  \"taxId\": \"NIT-PM-{{runId}}\",\n  \"businessType\": \"RESTAURANT\",\n  \"description\": \"Negocio creado por la colección del Módulo 4\",\n  \"address\": \"Calle 1 #2-3\",\n  \"city\": \"Bogotá\",\n  \"department\": \"Cundinamarca\",\n  \"contactPhone\": \"3001234567\",\n  \"contactEmail\": \"contacto.{{runId}}@test.com\",\n  \"deliveryFee\": 3000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 esperado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('businessId', jsonBody.business.id);",
+                  "pm.test('Estado PENDING', () => pm.expect(jsonBody.business.status).to.eql('PENDING'));",
+                  "pm.test('Domicilio 3000', () => pm.expect(Number(jsonBody.business.deliveryFee)).to.eql(3000));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 · Aprobar empresa",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/{{businessId}}/approve",
+            "description": "El administrador aprueba la empresa para que pueda recibir pedidos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Empresa aprobada', () => pm.expect(pm.response.json().business.status).to.eql('APPROVED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 · Registrar usuario domiciliario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Domiciliario Postman\",\n  \"email\": \"{{domiciliario_email}}\",\n  \"password\": \"{{domiciliario_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const runId = pm.environment.get('runId');",
+                  "pm.environment.set('domiciliario_email', 'domiciliario.' + runId + '@test.com');",
+                  "pm.environment.set('domiciliario_password', 'Test1234!');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 esperado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('token_domiciliario', jsonBody.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 · Registrar domiciliario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"CC\",\n  \"documentNumber\": \"CC-PM-{{runId}}\",\n  \"birthDate\": \"1995-05-20\",\n  \"address\": \"Carrera 10 #20-30\",\n  \"city\": \"Bogotá\",\n  \"vehicleType\": \"MOTORCYCLE\",\n  \"vehiclePlate\": \"ABC12D\",\n  \"licenseNumber\": \"LIC-PM-{{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 esperado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('deliveryId', jsonBody.delivery.id);",
+                  "pm.test('Estado PENDING', () => pm.expect(jsonBody.delivery.status).to.eql('PENDING'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 · Aprobar domiciliario",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/{{deliveryId}}/approve"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Domiciliario aprobado', () => pm.expect(pm.response.json().delivery.status).to.eql('APPROVED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 · Registrar cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cliente Postman\",\n  \"email\": \"{{cliente_email}}\",\n  \"password\": \"{{cliente_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const runId = pm.environment.get('runId');",
+                  "pm.environment.set('cliente_email', 'cliente.' + runId + '@test.com');",
+                  "pm.environment.set('cliente_password', 'Test1234!');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 esperado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('token_cliente', jsonBody.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 · Crear producto Hamburguesa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Hamburguesa\",\n  \"description\": \"Hamburguesa de prueba\",\n  \"price\": 20000,\n  \"sku\": \"HAMB-{{runId}}\",\n  \"stock\": 10,\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 esperado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('producto1Id', jsonBody.product.id);",
+                  "pm.test('Stock inicial 10', () => pm.expect(jsonBody.product.stock).to.eql(10));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 · Crear producto Jugo ilimitado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jugo natural\",\n  \"price\": 5000,\n  \"sku\": \"JUGO-{{runId}}\",\n  \"stock\": null,\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 esperado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "pm.environment.set('producto2Id', jsonBody.product.id);",
+                  "pm.test('Stock ilimitado', () => pm.expect(jsonBody.product.stock).to.eql(null));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Pedido feliz",
+      "item": [
+        {
+          "name": "11 · Crear pedido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{businessId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{producto1Id}}\",\n      \"quantity\": 2\n    },\n    {\n      \"productId\": \"{{producto2Id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"address\": \"Calle 100 #20-30\",\n  \"city\": \"Bogotá\",\n  \"department\": \"Cundinamarca\",\n  \"contactPhone\": \"3001112233\",\n  \"paymentMethod\": \"CASH\",\n  \"notes\": \"Sin cebolla\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 esperado', () => pm.response.to.have.status(201));",
+                  "const jsonBody = pm.response.json();",
+                  "const order = jsonBody.order;",
+                  "pm.environment.set('pedido1Id', order.id);",
+                  "pm.test('Estado PENDING', () => pm.expect(order.status).to.eql('PENDING'));",
+                  "pm.test('Subtotal 45000', () => pm.expect(order.subtotal).to.eql(45000));",
+                  "pm.test('Domicilio 3000', () => pm.expect(order.deliveryFee).to.eql(3000));",
+                  "pm.test('Total 48000', () => pm.expect(order.total).to.eql(48000));",
+                  "pm.test('Dos ítems', () => pm.expect(order.items).to.have.lengthOf(2));",
+                  "pm.test('Precios numéricos', () => order.items.forEach(item => pm.expect(item.unitPrice).to.be.a('number')));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 · El stock se descuenta",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Stock 8', () => pm.expect(pm.response.json().product.stock).to.eql(8));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 · Cliente lista sus pedidos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "const pedidoId = Number(pm.environment.get('pedido1Id'));",
+                  "pm.test('Incluye el pedido', () => pm.expect(jsonBody.orders.some(order => order.id === pedidoId)).to.eql(true));",
+                  "pm.test('Paginación', () => pm.expect(jsonBody.pagination.total).to.be.at.least(1));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 · Detalle del pedido con historial",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders/{{pedido1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const order = pm.response.json().order;",
+                  "pm.test('Estado PENDING', () => pm.expect(order.status).to.eql('PENDING'));",
+                  "pm.test('Un evento de historial', () => pm.expect(order.history).to.have.lengthOf(1));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 · Empresa lista sus pedidos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/orders?status=PENDING"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const jsonBody = pm.response.json();",
+                  "const pedidoId = Number(pm.environment.get('pedido1Id'));",
+                  "pm.test('Incluye el pedido pendiente', () => pm.expect(jsonBody.orders.some(order => order.id === pedidoId)).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 · Empresa acepta el pedido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/orders/{{pedido1Id}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const order = pm.response.json().order;",
+                  "pm.test('Estado ACCEPTED', () => pm.expect(order.status).to.eql('ACCEPTED'));",
+                  "pm.test('Fecha de aceptación', () => pm.expect(order.acceptedAt).to.not.eql(null));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "17 · No se puede aceptar dos veces (409)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/orders/{{pedido1Id}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 esperado', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "18 · Empresa marca en preparación",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/orders/{{pedido1Id}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PREPARING\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado PREPARING', () => pm.expect(pm.response.json().order.status).to.eql('PREPARING'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "19 · Empresa marca listo para entrega",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/orders/{{pedido1Id}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"READY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const order = pm.response.json().order;",
+                  "pm.test('Estado READY', () => pm.expect(order.status).to.eql('READY'));",
+                  "pm.test('Fecha de listo', () => pm.expect(order.readyAt).to.not.eql(null));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "20 · Estado fuera del flujo de empresa (400)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/orders/{{pedido1Id}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"DELIVERED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 esperado', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "21 · Domiciliario ve pedidos disponibles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/me/available-orders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const pedidoId = Number(pm.environment.get('pedido1Id'));",
+                  "pm.test('Incluye el pedido listo', () => pm.expect(pm.response.json().orders.some(order => order.id === pedidoId)).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "22 · Domiciliario toma el pedido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/me/orders/{{pedido1Id}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const order = pm.response.json().order;",
+                  "const deliveryId = Number(pm.environment.get('deliveryId'));",
+                  "pm.test('Estado ON_THE_WAY', () => pm.expect(order.status).to.eql('ON_THE_WAY'));",
+                  "pm.test('Asignado a mí', () => pm.expect(order.delivery.id).to.eql(deliveryId));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "23 · Domiciliario lista sus pedidos asignados",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/me/orders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const pedidoId = Number(pm.environment.get('pedido1Id'));",
+                  "pm.test('Incluye el pedido asignado', () => pm.expect(pm.response.json().orders.some(order => order.id === pedidoId)).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "24 · Domiciliario entrega el pedido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/me/orders/{{pedido1Id}}/deliver"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const order = pm.response.json().order;",
+                  "pm.test('Estado DELIVERED', () => pm.expect(order.status).to.eql('DELIVERED'));",
+                  "pm.test('Fecha de entrega', () => pm.expect(order.deliveredAt).to.not.eql(null));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "25 · No se puede entregar dos veces (409)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/me/orders/{{pedido1Id}}/deliver"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 esperado', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "26 · El cliente ve el pedido entregado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders/{{pedido1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado DELIVERED', () => pm.expect(pm.response.json().order.status).to.eql('DELIVERED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "27 · No se puede cancelar un pedido entregado (409)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders/{{pedido1Id}}/cancel",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Ya no lo necesito\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 esperado', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "28 · El stock entregado no se restaura",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Stock sigue en 8', () => pm.expect(pm.response.json().product.stock).to.eql(8));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "29 · Administrador lista pedidos entregados",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/orders?status=DELIVERED&limit=100"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const pedidoId = Number(pm.environment.get('pedido1Id'));",
+                  "pm.test('Incluye el pedido entregado', () => pm.expect(pm.response.json().orders.some(order => order.id === pedidoId)).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "30 · Administrador ve el historial completo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/orders/{{pedido1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Seis eventos de historial', () => pm.expect(pm.response.json().order.history).to.have.lengthOf(6));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "31 · Dashboard con estadísticas de pedidos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/dashboard"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Pedidos entregados', () => pm.expect(pm.response.json().stats.orders.DELIVERED).to.be.at.least(1));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Rechazo y cancelaciones",
+      "item": [
+        {
+          "name": "32 · Crear pedido 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{businessId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{producto1Id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"address\": \"Calle 200 #10-20\",\n  \"city\": \"Bogotá\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 esperado', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('pedido2Id', pm.response.json().order.id);",
+                  "pm.test('Estado PENDING', () => pm.expect(pm.response.json().order.status).to.eql('PENDING'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "33 · El pedido 2 descuenta stock",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Stock 7', () => pm.expect(pm.response.json().product.stock).to.eql(7));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "34 · Empresa rechaza el pedido 2",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/orders/{{pedido2Id}}/reject",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Producto agotado para hoy\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const order = pm.response.json().order;",
+                  "pm.test('Estado REJECTED', () => pm.expect(order.status).to.eql('REJECTED'));",
+                  "pm.test('Motivo guardado', () => pm.expect(order.rejectionReason).to.eql('Producto agotado para hoy'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "35 · El rechazo restaura el stock",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Stock 8', () => pm.expect(pm.response.json().product.stock).to.eql(8));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "36 · Crear pedido 3",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{businessId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{producto1Id}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"address\": \"Calle 300 #30-40\",\n  \"city\": \"Bogotá\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 esperado', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('pedido3Id', pm.response.json().order.id);",
+                  "pm.test('El pedido 3 descuenta stock a 6', () => pm.expect(pm.response.json().order.items[0].quantity).to.eql(2));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "37 · Cliente cancela el pedido 3",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders/{{pedido3Id}}/cancel",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Cambié de opinión\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado CANCELLED', () => pm.expect(pm.response.json().order.status).to.eql('CANCELLED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "38 · No se puede cancelar dos veces (409)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders/{{pedido3Id}}/cancel",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Otra vez\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 esperado', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "39 · La cancelación restaura el stock",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Stock 8', () => pm.expect(pm.response.json().product.stock).to.eql(8));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "40 · Crear pedido 4",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{businessId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{producto1Id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"address\": \"Calle 400 #40-50\",\n  \"city\": \"Bogotá\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 esperado', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('pedido4Id', pm.response.json().order.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "41 · Empresa acepta el pedido 4",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/orders/{{pedido4Id}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado ACCEPTED', () => pm.expect(pm.response.json().order.status).to.eql('ACCEPTED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "42 · Administrador cancela el pedido 4",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/orders/{{pedido4Id}}/cancel",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Pedido bloqueado por administración\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado CANCELLED', () => pm.expect(pm.response.json().order.status).to.eql('CANCELLED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "43 · La cancelación administrativa restaura el stock",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/products/{{producto1Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Stock 8', () => pm.expect(pm.response.json().product.stock).to.eql(8));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Asignación administrativa",
+      "item": [
+        {
+          "name": "44 · Crear pedido 5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{businessId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{producto1Id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"address\": \"Calle 500 #50-60\",\n  \"city\": \"Bogotá\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 esperado', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('pedido5Id', pm.response.json().order.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "45 · Empresa acepta el pedido 5",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/orders/{{pedido5Id}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "46 · Empresa prepara el pedido 5",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/orders/{{pedido5Id}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PREPARING\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "47 · Empresa marca listo el pedido 5",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/orders/{{pedido5Id}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"READY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "48 · Administrador asigna domiciliario",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/orders/{{pedido5Id}}/assign",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deliveryId\": \"{{deliveryId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const order = pm.response.json().order;",
+                  "const deliveryId = Number(pm.environment.get('deliveryId'));",
+                  "pm.test('Domiciliario asignado', () => pm.expect(order.delivery.id).to.eql(deliveryId));",
+                  "pm.test('Sigue READY hasta recoger', () => pm.expect(order.status).to.eql('READY'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "49 · El domiciliario ve el pedido asignado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/me/orders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "const pedidoId = Number(pm.environment.get('pedido5Id'));",
+                  "pm.test('Incluye el pedido 5', () => pm.expect(pm.response.json().orders.some(order => order.id === pedidoId)).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "50 · El domiciliario recoge el pedido 5",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/me/orders/{{pedido5Id}}/pickup"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado ON_THE_WAY', () => pm.expect(pm.response.json().order.status).to.eql('ON_THE_WAY'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "51 · El domiciliario entrega el pedido 5",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/me/orders/{{pedido5Id}}/deliver"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado DELIVERED', () => pm.expect(pm.response.json().order.status).to.eql('DELIVERED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Validaciones y permisos",
+      "item": [
+        {
+          "name": "52 · Pedido sin productos (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{businessId}}\",\n  \"items\": [],\n  \"address\": \"Calle 1\",\n  \"city\": \"Bogotá\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 esperado', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "53 · Cantidad inválida (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{businessId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{producto1Id}}\",\n      \"quantity\": 0\n    }\n  ],\n  \"address\": \"Calle 1\",\n  \"city\": \"Bogotá\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 esperado', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "54 · Método de pago inválido (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{businessId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{producto1Id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"address\": \"Calle 1\",\n  \"city\": \"Bogotá\",\n  \"paymentMethod\": \"BITCOIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 esperado', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "55 · Stock insuficiente (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{businessId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{producto1Id}}\",\n      \"quantity\": 9\n    }\n  ],\n  \"address\": \"Calle 1\",\n  \"city\": \"Bogotá\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 esperado', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "56 · Cliente no accede a pedidos de empresa (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/businesses/me/orders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('403 esperado', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "57 · Empresa no accede a rutas de domiciliario (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_empresa}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/deliveries/me/available-orders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('403 esperado', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "58 · Domiciliario no accede al panel admin (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_domiciliario}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/orders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('403 esperado', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "59 · Sin token no se consultan pedidos (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('401 esperado', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "60 · Administrador desactiva el jugo",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/products/{{producto2Id}}/deactivate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 esperado', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "61 · No se pide un producto desactivado (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_cliente}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{businessId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{producto2Id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"address\": \"Calle 1\",\n  \"city\": \"Bogotá\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 esperado', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

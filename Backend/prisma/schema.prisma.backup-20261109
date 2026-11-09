@@ -1,0 +1,285 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  CLIENT
+  DELIVERY
+  BUSINESS
+  ADMIN
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BusinessType {
+  RESTAURANT
+  STORE
+}
+
+enum VehicleType {
+  MOTORCYCLE
+  BICYCLE
+  CAR
+  OTHER
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  READY
+  ON_THE_WAY
+  DELIVERED
+  REJECTED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roles UserRole[]
+
+  businessProfile          BusinessProfile?     @relation("BusinessOwner")
+  deliveryProfile          DeliveryProfile?     @relation("DeliveryOwner")
+  reviewedBusinessProfiles BusinessProfile[]    @relation("BusinessReviewer")
+  reviewedDeliveryProfiles DeliveryProfile[]    @relation("DeliveryReviewer")
+  clientOrders             Order[]              @relation("OrderClient")
+  orderStatusChanges       OrderStatusHistory[] @relation("OrderStatusChangedBy")
+}
+
+model Role {
+  id    Int        @id @default(autoincrement())
+  name  RoleName   @unique
+  users UserRole[]
+}
+
+model UserRole {
+  id     Int @id @default(autoincrement())
+  userId Int
+  roleId Int
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, roleId])
+}
+
+model BusinessProfile {
+  id           Int            @id @default(autoincrement())
+  userId       Int            @unique
+  businessName String
+  legalName    String?
+  taxId        String?        @unique
+  businessType BusinessType
+  description  String?        @db.Text
+  address      String
+  city         String
+  department   String?
+  contactPhone String?
+  contactEmail String?
+  logoUrl      String?        @db.Text
+  documentUrl  String?        @db.Text
+  deliveryFee  Decimal        @default(0) @db.Decimal(10, 2)
+  status       ApprovalStatus @default(PENDING)
+
+  rejectionReason String?   @db.Text
+  reviewedById    Int?
+  reviewedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User  @relation("BusinessOwner", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("BusinessReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  categories Category[]
+  products   Product[]
+  orders     Order[]
+
+  @@index([status])
+  @@index([businessType])
+}
+
+model DeliveryProfile {
+  id             Int         @id @default(autoincrement())
+  userId         Int         @unique
+  documentType   String
+  documentNumber String      @unique
+  birthDate      DateTime?
+  address        String
+  city           String
+  vehicleType    VehicleType
+  vehiclePlate   String?
+  licenseNumber  String?
+  documentUrl    String?     @db.Text
+  licenseUrl     String?     @db.Text
+
+  emergencyContactName  String?
+  emergencyContactPhone String?
+
+  status          ApprovalStatus @default(PENDING)
+  rejectionReason String?        @db.Text
+  reviewedById    Int?
+  reviewedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User  @relation("DeliveryOwner", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("DeliveryReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  orders Order[]
+
+  @@index([status])
+  @@index([vehicleType])
+}
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  businessId  Int
+  name        String
+  description String?  @db.Text
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business BusinessProfile @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+}
+
+model Product {
+  id          Int     @id @default(autoincrement())
+  businessId  Int
+  categoryId  Int?
+  name        String
+  description String? @db.Text
+  price       Decimal @db.Decimal(10, 2)
+  imageUrl    String? @db.Text
+  sku         String?
+  stock       Int?
+  isAvailable Boolean @default(true)
+
+  // Control del administrador: un producto inactivo no se muestra al público.
+  isActive Boolean @default(true)
+
+  // Eliminación lógica realizada por la empresa.
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business BusinessProfile @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  orderItems OrderItem[]
+
+  @@unique([businessId, sku])
+  @@index([businessId])
+  @@index([categoryId])
+  @@index([isAvailable])
+  @@index([isActive])
+  @@index([deletedAt])
+}
+
+model Order {
+  id            Int           @id @default(autoincrement())
+  clientId      Int
+  businessId    Int
+  deliveryId    Int?
+  status        OrderStatus   @default(PENDING)
+  paymentMethod PaymentMethod @default(CASH)
+
+  subtotal    Decimal @db.Decimal(10, 2)
+  deliveryFee Decimal @db.Decimal(10, 2)
+  total       Decimal @db.Decimal(10, 2)
+
+  address      String
+  city         String
+  department   String?
+  contactPhone String?
+  notes        String? @db.Text
+
+  rejectionReason    String? @db.Text
+  cancellationReason String? @db.Text
+
+  acceptedAt   DateTime?
+  readyAt      DateTime?
+  assignedAt   DateTime?
+  dispatchedAt DateTime?
+  deliveredAt  DateTime?
+  cancelledAt  DateTime?
+  rejectedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client   User             @relation("OrderClient", fields: [clientId], references: [id], onDelete: Cascade)
+  business BusinessProfile  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  delivery DeliveryProfile? @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+
+  items   OrderItem[]
+  history OrderStatusHistory[]
+
+  @@index([clientId])
+  @@index([businessId])
+  @@index([deliveryId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  productId   Int?
+  productName String
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  quantity    Int
+  total       Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model OrderStatusHistory {
+  id          Int         @id @default(autoincrement())
+  orderId     Int
+  status      OrderStatus
+  changedById Int?
+  note        String?     @db.Text
+  createdAt   DateTime    @default(now())
+
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy User? @relation("OrderStatusChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([createdAt])
+}
